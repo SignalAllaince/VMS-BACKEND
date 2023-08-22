@@ -18,6 +18,6 @@ role='superadmin'
 _password='iloverice'
 hashed = bcrypt.hashpw(_password.encode("utf-8"), bcrypt.gensalt())
 cursor.execute("INSERT INTO admin (username, PasswordHash, role) VALUES (?, ?, ?)", _username, hashed, role)
-cunn.commit()
+conn.commit()
 conn.close()
 print('successful')

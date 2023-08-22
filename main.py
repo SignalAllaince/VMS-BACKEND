@@ -62,19 +62,15 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization')
-        if not token:
-            return {'message': 'Token is missing.'}, 401
-        
         try:
-            data = jwt.decode(token, 'mynameisslimshady', algorithms=['HS256'])
-            # You can store user data from the token in g object for use in route handlers
-            g.user_data = data
+            if not token:
+                return {'message': 'Token is missing.'}, 401
+            else:
+                return f(*args, **kwargs)
         except jwt.ExpiredSignatureError:
             return {'message': 'Token has expired.'}, 401
         except jwt.DecodeError:
             return {'message': 'Token is invalid.'}, 401
-
-        return f(*args, **kwargs)
 
     return decorated
 
@@ -90,25 +86,27 @@ def login():
 
         # Change the condition to check for request method
         if request.method == 'POST':
-            session.pop('admin', None)
             cursor.execute("SELECT * FROM admin WHERE username=%s", (_username,))
             for row in cursor.fetchall():
-                user_details.append({"id": row['id'], "username": row['username'], "hashed_password": row['PasswordHash']})
+                user_details.append({"id": row['id'], "username": row['username'], "hashed_password": row['PasswordHash'], "role": row['role'], "status": row['status']})
             if len(user_details) > 0:
                 user = user_details[0]
                 if _username == user['username']:
-                    if bcrypt.checkpw(_password, user['hashed_password'].encode('utf-8')):
-                        # Generate JWT token
-                        token_payload = {
-                            'id': user['id'],
-                            ''
-                            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Token expiration time
-                        }
-                        token = jwt.encode(token_payload, 'mynameisslimshady', algorithm='HS256')
+                    if user['status'] == 'Active':
+                        if bcrypt.checkpw(_password, user['hashed_password'].encode('utf-8')):
+                            # Generate JWT token
+                            token_payload = {
+                                'id': user['id'],
+                                ''
+                                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Token expiration time
+                            }
+                            token = jwt.encode(token_payload, 'mynameisslimshady', algorithm='HS256')
 
-                        return {"token": token, "username": user['username']}, 200
+                            return {"token": token, "username": user['username']}, 200
+                        else:
+                            return {"message": "Invalid Password."}, 401
                     else:
-                        return {"message": "Invalid Password."}, 401
+                       return {"message": "User is currently inactive"}, 401 
                 else:
                     return {"message": "Invalid Username."}, 401
             else:
@@ -116,20 +114,26 @@ def login():
         else:
             return {"message": "Method not allowed."}, 405  # Return a 405 Method Not Allowed response
     except Exception as e:
+        print(e)
         return {"message": "An error occurred."}, 500  # Return a 500 Internal Server Error response
 
-    cursor.close()
-    conn.close()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @app.route('/create-admin', methods=['POST'])
 @superadmin_required
 def create_admin():
-    role = 'admin'
     try:
         _json = request.json
         _username = _json['username']
         _password = _json['password']
         _password_confirm = _json['password_confirm']  # Correct field name
+        _role = _json['role']
+        _status = _json['status']
+        _email = _json['email']
         if request.method == 'POST':
             conn = mysql.connect()
             cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -140,8 +144,8 @@ def create_admin():
             if _password == _password_confirm:
                 hashed = bcrypt.hashpw(_password.encode("utf-8"), bcrypt.gensalt())
                 cursor.execute(
-                    "INSERT INTO admin (username, PasswordHash, role ) VALUES (%s, %s, %s)",
-                    (_username, hashed, role)
+                    "INSERT INTO admin (username, PasswordHash, role, status, email ) VALUES (%s, %s, %s, %s, %s)",
+                    (_username, hashed, _role, _status, _email)
                 )
                 conn.commit()
                 return {"message": "Admin created successfully"}, 200
@@ -152,119 +156,157 @@ def create_admin():
     except Exception as e:
         return {"message": "An error occurred"}, 500
     finally:
-        cursor.close()
-        conn.close()
-
-
-@app.route('/change-password', methods=['PUT'])
-def change_password():
-    if g.admin:
-        current_admin = session['admin']
-        password_details = []
-        try:
-            _json = request.json
-            _password = _json['password']
-            _password_confirm = _json['password']
-            if _username and _password and _password_confirm == 'PUT':
-                if _password == _password_confirm:
-                    conn = mysql.connect()
-                    cursor = conn.cursor(pymysql.cursors.DictCursor)	
-                    cursor.execute("UPDATE admin SET password = ? WHERE username=?", _password, current_admin)
-                else:
-                    return {"message": "The passwords dont match"}
-                user = user_details[0]
-                    
-        except Exception as e:
-            print(e)
-        finally:
-            cursor.close() 
+        if cursor:
+            cursor.close()
+        if conn:
             conn.close()
 
 
-# @app.route('/create', methods=['GET', 'POST'])
-# def create_emp():
-#     try:        
-#         _json = request.json
-#         _name = _json['name']
-#         _email = _json['email']
-#         _phone = _json['phone']
-#         _address = _json['address']	
-#         if _name and _email and _phone and _address and request.method == 'POST':
-#             conn = mysql.connect()
-#             cursor = conn.cursor(pymysql.cursors.DictCursor)		
-#             sqlQuery = "INSERT INTO emp(name, email, phone, address) VALUES(%s, %s, %s, %s)"
-#             bindData = (_name, _email, _phone, _address)            
-#             cursor.execute(sqlQuery, bindData)
-#             conn.commit()
-#             respone = jsonify('Employee added successfully!')
-#             respone.status_code = 200
-#             return respone
-#         else:
-#             return showMessage()
-#     except Exception as e:
-#         print(e)
-#     finally:
-#         cursor.close() 
-#         conn.close()          
-     
-# @app.route('/emp')
-# def emp():
-#     try:
-#         conn = mysql.connect()
-#         cursor = conn.cursor(pymysql.cursors.DictCursor)
-#         cursor.execute("SELECT id, name, email, phone, address FROM emp")
-#         empRows = cursor.fetchall()
-#         respone = jsonify(empRows)
-#         respone.status_code = 200
-#         return respone
-#     except Exception as e:
-#         print(e)
-#     finally:
-#         cursor.close() 
-#         conn.close()  
+@app.route('/change-password', methods=['PUT'])
+@token_required
+def change_password():
+    try:
+        _json = request.json
+        _password = _json['password']
+        _password_confirm = _json['password confirm']
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)	
+        if request.method == 'PUT':
+            token = request.headers.get('Authorization')
+            if token:
+                token = token.replace('Bearer ', '')
+                payload = jwt.decode(token, 'mynameisslimshady', algorithms=['HS256'])
+                user_id = payload['id']
+                cursor.execute("SELECT username FROM admin WHERE id=%s", (user_id,))
+                user = cursor.fetchone()
+                if _password == _password_confirm:
+                    hashed = bcrypt.hashpw(_password.encode("utf-8"), bcrypt.gensalt())
+                    cursor.execute("UPDATE admin SET PasswordHash = %s WHERE username=%s", (hashed, user['username']))
+                    conn.commit()
+                    return {"message": "Password changed successfully"}, 200
+                else:
+                    return {"message": "The passwords dont match"}, 401
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-# @app.route('/emp/')
-# def emp_details(emp_id):
-#     try:
-#         conn = mysql.connect()
-#         cursor = conn.cursor(pymysql.cursors.DictCursor)
-#         cursor.execute("SELECT id, name, email, phone, address FROM emp WHERE id =%s", emp_id)
-#         empRow = cursor.fetchone()
-#         respone = jsonify(empRow)
-#         respone.status_code = 200
-#         return respone
-#     except Exception as e:
-#         print(e)
-#     finally:
-#         cursor.close() 
-#         conn.close() 
+@app.route('/change-details', methods=['PUT'])
+@superadmin_required
+def change_details():
+    try:
+        _json = request.json
+        _id = _json['id']
+        _username = _json['username']
+        _email = _json['email']
+        _status = _json['status']
+        _role = _json['role']
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)	
+        if request.method == 'PUT':
+            cursor.execute("UPDATE admin SET username = %s, role= %s, status= %s, email= %s WHERE id=%s", (_username, _role, _status, _email, _id))
+            conn.commit()
+            return {"message": "Details changed successfully"}, 200
+        else:
+            return {"message": "There is an error"}, 401
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-# @app.route('/update', methods=['PUT'])
-# def update_emp():
-#     try:
-#         _json = request.json
-#         _id = _json['id']
-#         _name = _json['name']
-#         _email = _json['email']
-#         _phone = _json['phone']
-#         _address = _json['address']
-#         if _name and _email and _phone and _address and _id and request.method == 'PUT':			
-#             sqlQuery = "UPDATE emp SET name=%s, email=%s, phone=%s, address=%s WHERE id=%s"
-#             bindData = (_name, _email, _phone, _address, _id,)
-#             conn = mysql.connect()
-#             cursor = conn.cursor()
-#             cursor.execute(sqlQuery, bindData)
-#             conn.commit()
-#             respone = jsonify('Employee updated successfully!')
-#             respone.status_code = 200
-#             return respone
-#         else:
-#             return showMessage()
-#     except Exception as e:
-#         print(e)
-#     finally:
-#         cursor.close() 
-#         conn.close() 
+@app.route('/admin-detail/<int:admin_id>', methods=['GET'])
+@token_required
+def admin_detail(admin_id):
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute("SELECT id, username, email, role, status FROM admin WHERE id=%s", (admin_id))
+        admin = cursor.fetchone()
+        response = jsonify(admin)
+        response.status_code = 200
+        return response
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/admin-management', methods=['GET'])
+@token_required
+def admin_management():
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute("SELECT username, email, role, status FROM admin")
+        admin = cursor.fetchall()
+        response = jsonify(admin)
+        response.status_code = 200
+        return response
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/visit-management/<int:visit_id>', methods=['GET'])
+@token_required
+def visit_management(visit_id):
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute("SELECT * FROM visitor WHERE id=%s", (visit_id))
+        visit = cursor.fetchone()
+        response = jsonify(visit)
+        response.status_code = 200
+        return response
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/visitor-management', methods=['GET'])
+@token_required
+def visitor_management():
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute("SELECT * FROM visitor")
+        visitors = cursor.fetchall()
+        response = jsonify(visitors)
+        response.status_code = 200
+        return response
+                
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 # @app.route('/delete/', methods=['DELETE'])
 # def delete_emp(id):
@@ -282,27 +324,25 @@ def change_password():
 # 		cursor.close() 
 # 		conn.close()
         
-       
 @app.errorhandler(404)
 def showMessage(error=None):
     message = {
         'status': 404,
         'message': 'Record not found: ' + request.url,
     }
-    respone = jsonify(message)
-    respone.status_code = 404
-    return respone
+    response = jsonify(message)
+    response.status_code = 404
+    return response
 
-@app.before_request
-def before_request():
-    g.user = None
-    if 'admin' in session:
-        g.user = session['admin']
-
-@app.route('/logout')
-def dropsession():
-    session.pop('admin', None)
-    return redirect('/')
+@app.route('/logout', methods=['POST'])
+@token_required
+def logout():
+    try:
+        return {"message": "Logout successful"}, 200
+    
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred"}, 500
         
 if __name__ == "__main__":
     app.run(debug=True)
