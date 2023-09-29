@@ -1,12 +1,20 @@
 import pymysql
 from app import app
 from config import mysql
-from flask import jsonify
-from flask import flash, request, session, redirect, url_for, g
+from flask import jsonify, redirect
+from flask import request
 from functools import wraps
+from chatbot import generate_response
+from jsondumps import extract_json
+from sendemail import send_email, send_external_email
+from getstaffdata import is_person_in_company
+import json
 import jwt
 import datetime
 import bcrypt
+
+# Process the text
+
 # superadmin = User(username='superadmin', email='superadmin@example.com', password='hashed_password', role='superadmin')
 # db.session.add(superadmin)
 # db.session.commit()
@@ -307,6 +315,118 @@ def visitor_management():
             cursor.close()
         if conn:
             conn.close()
+@app.route('/accept/<token>', methods=['PUT'])
+def accept_visit(token):
+    # try:
+        #decode token
+        payload = jwt.decode(token, 'mynameisslimshady', algorithms=['HS256'], options={"verify_exp": False})
+        visitor_name = payload.get('visitor_name', '')
+        staff_name = payload.get('staff_name', '')
+        purpose_of_visit = payload.get('purpose_of_visit', '')
+        # visitor_number = payload.get('visitor_number', '')
+        selected_time = payload.get('selected_time', '')
+        visitor_email = payload.get('visitor_email', '')
+        status = "accepted"
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)	
+        if request.method == 'PUT':
+            cursor.execute("UPDATE visitor SET status = %s WHERE visitor_name=%s AND staff_name=%s AND purpose_of_visit=%s AND selected_time=%s AND visitor_email=%s", (status, visitor_name, staff_name, purpose_of_visit, selected_time, visitor_email))
+            conn.commit()
+            send_external_email(visitor_email, token)
+            return {"message": "email sent successfully to visitor"}, 200
+        else:
+            return {"message": "There is an error"}, 401
+    # except jwt.ExpiredSignatureError:
+    #     return {"message": "Token has expired"}, 401
+    # except jwt.DecodeError:
+    #     return {"message": "Token is invalid"}, 401
+    # except Exception as e:
+    #     return {"message": "An error occurred"}, 500
+
+
+
+
+
+
+
+@app.route('/reject/<token>', methods=['PUT'])
+def reject_visit(token):
+    payload = jwt.decode(token, 'mynameisslimshady', algorithms=['HS256'], options={"verify_exp": False})
+    visitor_name = payload.get('visitor_name', '')
+    staff_name = payload.get('staff_name', '')
+    purpose_of_visit = payload.get('purpose_of_visit', '')
+    # visitor_number = payload.get('visitor_number', '')
+    selected_time = payload.get('selected_time', '')
+    visitor_email = payload.get('visitor_email', '')
+    status = "rejected"
+    conn = mysql.connect()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)	
+    if request.method == 'PUT':
+        cursor.execute("UPDATE visitor SET status = %s WHERE visitor_name=%s AND staff_name=%s AND purpose_of_visit=%s AND selected_time=%s AND visitor_email=%s", (status, visitor_name, staff_name, purpose_of_visit, selected_time, visitor_email))
+        conn.commit()
+
+        return {"message": "Meeting status successfully updated"}, 200
+    else:
+        return {"message": "There is an error"}, 401
+
+@app.route('/', methods=['POST'])
+def openai_chat():
+    try:
+        data = request.json
+        user_input = data["user"]
+        response = generate_response(user_input)
+        json_data = extract_json(response) # Extract the JSON data from the response
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)                                                                                                                                                     
+        
+        if json_data:
+            data = json.loads(json_data)
+            # Access the values using Python variables
+            visitor_name = data["Visitor_Name"]
+            staff_name = data["Staff_Name"]
+            purpose_of_visit = data["Purpose_of_Visit"]
+            visitor_number = data["Visitor_Phone_Number"]
+            selected_time = data["Selected_Time"]
+            visitor_email = data["Visitor_Email"]
+            cursor.execute(
+                        "INSERT INTO visitor (visitor_name, staff_name, purpose_of_visit, visitor_number, selected_time, visitor_email ) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (visitor_name, staff_name, purpose_of_visit, visitor_number, selected_time, visitor_email)
+                    )
+            conn.commit()
+            #get staff email address first
+            staff_details = is_person_in_company(staff_name)
+            staff_info = json.loads(staff_details)
+            if staff_info and isinstance(staff_info, list):
+                first_user_info = staff_info[0]  
+                staff_email = first_user_info.get('Email', 'Email not found') 
+                #send email to staff
+                payload = {
+                "visitor_name": visitor_name,
+                "staff_name": staff_name,
+                "purpose_of_visit": purpose_of_visit,
+                "visitor_number": visitor_number,
+                "selected_time": selected_time,
+                "visitor_email": visitor_email,
+                }
+
+                # Generate a unique token using JWT
+                token = jwt.encode(payload, 'mynameisslimshady', algorithm='HS256')
+                send_email(staff_email, token)
+            else:
+                return jsonify({"response": "error while retrieving user email"})
+        return jsonify({"response": response})
+    except Exception as e:
+        print(e)
+        return {"message": "An error occurred."}, 500  # Return a 500 Internal Server Error response
+
+    # finally:
+    #     if cursor:
+    #         cursor.close()
+    #     if conn:
+    #         conn.close()
+
+
+
 
 # @app.route('/delete/', methods=['DELETE'])
 # def delete_emp(id):
