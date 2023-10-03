@@ -327,7 +327,7 @@ def redirect_to_accept(token):
 
 @app.route('/reject/<token>', methods=['GET'])
 
-def redirect_to_accept(token):
+def redirect_to_reject(token):
     # Construct the URL for the /reject route with the token
     accept_url = url_for('accept_visit', token=token, _external=True)
 
@@ -484,4 +484,4 @@ def logout():
         return {"message": "An error occurred"}, 500
         
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
