@@ -1,7 +1,7 @@
 import pymysql
 from app import app
 from config import mysql
-from flask import jsonify, redirect
+from flask import jsonify, redirect, url_for
 from flask import request
 from functools import wraps
 from chatbot import generate_response
@@ -315,7 +315,26 @@ def visitor_management():
             cursor.close()
         if conn:
             conn.close()
-@app.route('/accept/<token>', methods=['PUT'])
+
+
+@app.route('/accept/<token>', methods=['GET'])
+def redirect_to_accept(token):
+    # Construct the URL for the /accept route with the token
+    accept_url = url_for('accept_visit', token=token, _external=True)
+
+    # Redirect the user to the /accept route with the token in the URL
+    return redirect(accept_url)
+
+@app.route('/reject/<token>', methods=['GET'])
+
+def redirect_to_accept(token):
+    # Construct the URL for the /reject route with the token
+    accept_url = url_for('accept_visit', token=token, _external=True)
+
+    # Redirect the user to the /reject route with the token in the URL
+    return redirect(accept_url)
+
+@app.route('/accept-visit/<token>', methods=['PUT'])
 def accept_visit(token):
     # try:
         #decode token
@@ -349,7 +368,7 @@ def accept_visit(token):
 
 
 
-@app.route('/reject/<token>', methods=['PUT'])
+@app.route('/reject-visit/<token>', methods=['PUT'])
 def reject_visit(token):
     payload = jwt.decode(token, 'mynameisslimshady', algorithms=['HS256'], options={"verify_exp": False})
     visitor_name = payload.get('visitor_name', '')
