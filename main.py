@@ -388,7 +388,7 @@ def reject_visit(token):
     else:
         return {"message": "There is an error"}, 401
 
-@app.route('/', methods=['POST'])
+@app.route('/bot', methods=['POST'])
 def openai_chat():
     try:
         data = request.json
