@@ -3,7 +3,7 @@ from flaskext.mysql import MySQL
 
 ssl_config = {
     'ssl': {
-        'cert': '../restful-api-vms/DigiCertGlobalRootCA.crt.pem'  # Replace with the actual path to the CA certificate
+        'cert': '../restful-api-vms/DigiCertGlobalRootCA.crt.pem'  #path to the CA certificate
     }
 }
 mysql = MySQL(ssl=ssl_config)
