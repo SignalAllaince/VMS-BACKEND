@@ -1,5 +1,7 @@
 import requests
 import json
+import os
+from dotenv import load_dotenv
 def get_access_token(tenant_id, client_id, client_secret):
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
     payload = {
@@ -76,10 +78,11 @@ def get_person_details(access_token, user_id):
 #     response = requests.get(mail_url, headers=headers)
 #     return response.json()
 # @app.route('/name-endpoint')
+load_dotenv()
 def is_person_in_company(search_name):
-    tenant_id = "47a5a918-b4ec-470f-86ca-c67e821ce45b"
-    client_id = "085c948e-eb80-4e91-86cf-becf02d3c9f3"
-    client_secret = "fYZ8Q~irIFnPf_a9GsISvL9PQfB5rblZ-XWrzcxH"
+    tenant_id = os.environ.get('TENANT_ID')
+    client_id = os.environ.get('CLIENT_ID')
+    client_secret = os.environ.get('CLIENT_SECRET') 
     # search_name = input("Enter the name or part of the name: ")
 
     access_token = get_access_token(tenant_id, client_id, client_secret)

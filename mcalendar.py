@@ -3,11 +3,14 @@ from datetime import datetime, timedelta
 import calendar
 import json
 from getstaffdata import is_person_in_company
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Set application's credentials
-tenant_id = "47a5a918-b4ec-470f-86ca-c67e821ce45b"
-client_id = "085c948e-eb80-4e91-86cf-becf02d3c9f3"
-client_secret = "fYZ8Q~irIFnPf_a9GsISvL9PQfB5rblZ-XWrzcxH"
+tenant_id = os.environ.get('TENANT_ID')
+client_id = os.environ.get('CLIENT_ID')
+client_secret = os.environ.get('CLIENT_SECRET') 
 
 # Function to get available time according to user email
 def get_available_times(fullname, time_interval_minutes=60):

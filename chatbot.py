@@ -3,14 +3,16 @@ import openai
 from getstaffdata import is_person_in_company
 from mcalendar import get_available_times
 # from jsondumps import extract_json
+import os
+from dotenv import load_dotenv
 import json
 # app = Flask(__name__)
-
+load_dotenv()
 # Set up OpenAI
-openai.api_type = "azure"
-openai.api_base = "https://vms-bot.openai.azure.com/"
-openai.api_version = "2023-07-01-preview"
-openai.api_key = "6d8cd596414a481496e8723a114de6fa"
+openai.api_type = os.environ.get('OPENAI_API_TYPE')
+openai.api_base = os.environ.get('OPENAI_API_BASE')
+openai.api_version = os.environ.get('OPENAI_API_VERSION')
+openai.api_key = os.environ.get('OPENAI_API_KEY')
 
 # Initialize an empty conversation with system message
 conversation = [

@@ -2,12 +2,16 @@ import requests
 import jwt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def send_external_email(recipient_email, token):
     # Azure AD application information
-    client_id = '085c948e-eb80-4e91-86cf-becf02d3c9f3'
-    client_secret = 'fYZ8Q~irIFnPf_a9GsISvL9PQfB5rblZ-XWrzcxH'
-    tenant_id = '47a5a918-b4ec-470f-86ca-c67e821ce45b'
+    tenant_id = os.environ.get('TENANT_ID')
+    client_id = os.environ.get('CLIENT_ID')
+    client_secret = os.environ.get('CLIENT_SECRET') 
     resource = 'https://graph.microsoft.com'  # Microsoft Graph API
     sender_email = 'unnamani@saconsulting.ai'
     # recipient_email = 'unnamani@saconsulting.ai'  # Replace with the recipient's email address
