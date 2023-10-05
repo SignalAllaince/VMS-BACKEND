@@ -2,7 +2,7 @@ from app import app
 from flaskext.mysql import MySQL
 import os
 from dotenv import load_dotenv
-
+#config
 ssl_config = {
     'ssl': {
         'cert': '../restful-api-vms/DigiCertGlobalRootCA.crt.pem'  #path to the CA certificate
